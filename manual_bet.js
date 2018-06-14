@@ -4,13 +4,15 @@ var startValue = '0.00000001',  // start value of BET AMOUNT
     stopCount = 8,              // stop if loss count greater then this value
     stopPercentage = 0.80,      // stop betting if balance is under this percentage
     stopBeforeSec = 30,         // In seconds for timer before stopping redirect on webpage
-    $hiloButton = $('#double_your_btc_bet_hi_button');  // set as $('#double_your_btc_bet_hi_button') or $('#double_your_btc_bet_lo_button')
+    clickButtonId = '#double_your_btc_bet_hi_button'; // #double_your_btc_bet_hi_button or #double_your_btc_bet_lo_button
 
 // system variable (DON'T SET)
 var stopped = false,
+    stopNow = false,
     loseCount = 0,
     startBalance = 0,
-    startTimestamp = 0;
+    startTimestamp = 0,
+    clickButton = null;
 
 function sleep(milliseconds) {
     var start = new Date().getTime();
@@ -54,6 +56,8 @@ function initGame() {
         $(this).hide();
     });
 
+    bindEvent();
+
     startBalance = deExponentize(parseFloat($('#balance').text()));
     startTimestamp = new Date().getTime();
 }
@@ -67,7 +71,7 @@ function getElapsed() {
     var min = ((now - startTimestamp) / 60000).toFixed(0);
     var sec = (((now - startTimestamp) % 60000) / 1000).toFixed(0);
 
-    return min + 'm ' + sec + 's';
+    return min + 'm' + sec + 's';
 }
 
 function multiplyBet() {
@@ -121,12 +125,30 @@ function multiplyBet() {
 function startGame() {
     console.log('Game started!');
     reset();
-    $hiloButton.click();
+    clickButton.click();
 }
 
-function stopGame() {
+function stopImmediately() {
+    stopNow = true;
+}
+
+function stopAfterWinBet() {
     console.log('Game will stop soon! Let me finish.');
     stopped = true;
+}
+
+function stopBeforeRedirect() {
+    var temp = $('title').text().match(/(\d+)/g);
+    if (temp == null) {
+        return;
+    }
+
+    var seconds = parseInt(temp[0]) * 60 + parseInt(temp[1]);
+    if (seconds < stopBeforeSec) {
+        return true;
+    }
+
+    return false;
 }
 
 function reset() {
@@ -152,72 +174,81 @@ function clickFreeRoll() {
     $('#free_play_form_button').click();
 }
 
-function stopBeforeRedirect() {
-    var temp = $('title').text().match(/(\d+)/g);
-    if (temp == null) {
-        return;
-    }
+function bindEvent() {
+    $('#double_your_btc_bet_lose').unbind().bind("DOMSubtreeModified", function(event) {
+        if (stopNow) {
+            return;
+        }
 
-    var seconds = parseInt(temp[0]) * 60 + parseInt(temp[1]);
-    if (seconds < stopBeforeSec) {
-        return true;
-    }
+        if ($(event.currentTarget).is(':contains("lose")')) {
+            console.log('You LOST, PL: ' + getProfitLoss() + ', Elapsed: ' + getElapsed());
 
-    return false;
+            if (!multiplyBet()) {
+                var wait = getRandomWait(10000, 60000);
+                console.log('reach stopCount, reload after ' + wait + ' msec');
+                setTimeout(function() {
+                    location.reload();
+                }, wait);
+
+                return;
+            }
+
+            setTimeout(function() {
+                clickButton.click();
+            }, getRandomWait(100, 666));
+        }
+    });
+
+    $('#double_your_btc_bet_win').unbind().bind("DOMSubtreeModified", function(event) {
+        if (stopNow) {
+            return;
+        }
+
+        if ($(event.currentTarget).is(':contains("win")')) {
+            if (stopBeforeRedirect()) {
+                console.log('Approaching redirect! Stop the game so we don\'t get redirected while loosing.');
+                stopAfterWinBet();
+
+                return;
+            }
+
+            if (checkJackpots()) {
+                console.log('weird, has jackpos! restart');
+                return;
+            }
+
+            if (hasEnoughMoney()) {
+                console.log('You WON, PL: ' + getProfitLoss() + ' elapsed: ' + getElapsed());
+                reset();
+                if (stopped) {
+                    stopped = false;
+
+                    return false;
+                }
+            } else {
+                console.log('no money');
+                return;
+            }
+
+            setTimeout(function() {
+                clickButton.click();
+            }, getRandomWait(100, 666));
+        }
+    });
 }
 
-$('#double_your_btc_bet_lose').unbind();
-$('#double_your_btc_bet_win').unbind();
-$('#double_your_btc_bet_lose').bind("DOMSubtreeModified", function(event) {
-    if ($(event.currentTarget).is(':contains("lose")')) {
-        console.log('You LOST, PL: ' + getProfitLoss() + ', Elapsed: ' + getElapsed());
+javascript: (function(e, s) {
+    e.src = s;
+    e.onload = function() {
+        jQuery.noConflict();
+        console.log('jQuery injected');
 
-        if (!multiplyBet()) {
-            console.log('reach stopCount, reload after 10 sec');
-            setTimeout(function() {
-                location.reload();
-            }, getRandomWait(10000, 60000));
+        sleep(1000);
 
-            return;
-        }
+        clickButton = $(clickButtonId);
 
-        setTimeout(function() {
-            $hiloButton.click();
-        }, getRandomWait(100, 666));
-    }
-});
-$('#double_your_btc_bet_win').bind("DOMSubtreeModified", function(event) {
-    if ($(event.currentTarget).is(':contains("win")')) {
-        if (stopBeforeRedirect()) {
-            console.log('Approaching redirect! Stop the game so we don\'t get redirected while loosing.');
-            stopGame();
-
-            return;
-        }
-
-        if (checkJackpots()) {
-            console.log('weird, has jackpos! restart');
-            return;
-        }
-
-        if (hasEnoughMoney()) {
-            console.log('You WON, PL: ' + getProfitLoss() + ' elapsed: ' + getElapsed());
-            reset();
-            if (stopped) {
-                stopped = false;
-
-                return false;
-            }
-        } else {
-            console.log('no money');
-            return;
-        }
-
-        setTimeout(function() {
-            $hiloButton.click();
-        }, getRandomWait(100, 666));
-    }
-});
-
-initGame();
-startGame();
+        initGame();
+        startGame();
+    };
+    document.head.appendChild(e);
+})(document.createElement('script'), '//code.jquery.com/jquery-3.3.1.min.js')

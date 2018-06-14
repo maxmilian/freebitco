@@ -5,7 +5,7 @@
 
 2. Save js for Freebitco
    Open [Freebitco](https://freebitco.in/?r=11646056), copy the following javascript code and paste into Custom Javascript For Web  
-   ![Custom Js For Freebitco](https://github.com/maxmilian/freebitco/blob/master/custom_js_for_freebitco.png)
+   ![Custom Js For Freebitco](custom_js_for_freebitco.png)
 
 3. Enjoy the game
 
